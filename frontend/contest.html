@@ -29,6 +29,47 @@
     let problemsCache = [];
 
     const STATUS = { upcoming: ["未开始", "cyan"], running: ["进行中", "AC"], ended: ["已结束", "gray"] };
+    const REG_STATUS = {
+      pending:  ["⏳ 报名审核中", "yellow"],
+      approved: ["✅ 报名已通过", "AC"],
+      rejected: ["❌ 报名未通过", "WA"],
+    };
+
+    // 当前用户在需报名竞赛下的操作区（报名/状态提示）
+    function regBlock(c) {
+      if (!c.require_approval || isAdmin) return "";
+      const me = OJ.currentUser();
+      if (!me) return `<div class="mt-8"><span class="badge yellow">需报名审核</span> <span class="muted" style="font-size:12px">登录后可报名</span></div>`;
+      const reg = c.my_registration;
+      if (!reg) {
+        return `<div class="mt-8"><button class="btn btn-primary btn-sm" onclick="register('${OJ.esc(c.id)}')">📝 报名参加</button>
+          <span class="muted" style="font-size:12px;margin-left:6px">该竞赛需报名并经管理员审核通过后才能做题</span></div>`;
+      }
+      const [label, cls] = REG_STATUS[reg.status] || [reg.status, "gray"];
+      let html = `<div class="mt-8"><span class="badge ${cls}">${label}</span>`;
+      if (reg.status === "rejected") {
+        if (reg.note) html += ` <span class="muted" style="font-size:12px">原因：${OJ.esc(reg.note)}</span>`;
+        html += ` <button class="btn btn-outline btn-sm" onclick="register('${OJ.esc(c.id)}')">重新报名</button>`;
+      } else {
+        html += ` <button class="btn btn-outline btn-sm" onclick="unregister('${OJ.esc(c.id)}')">取消报名</button>`;
+      }
+      return html + "</div>";
+    }
+
+    async function register(cid) {
+      if (!OJ.currentUser()) { OJ.toast("请先登录后报名", "error"); OJ.goLogin(); return; }
+      try {
+        const res = await OJ.api("/contests/" + cid + "/register", { method: "POST" });
+        OJ.toast("报名成功，请等待管理员审核", "success");
+        load();
+      } catch (e) { OJ.toast(e.message, "error"); }
+    }
+
+    async function unregister(cid) {
+      if (!await OJ.confirmDialog("确定取消报名？审核通过的资格也将一并取消。")) return;
+      try { await OJ.api("/contests/" + cid + "/unregister", { method: "POST" }); OJ.toast("已取消报名", "success"); load(); }
+      catch (e) { OJ.toast(e.message, "error"); }
+    }
 
     async function load() {
       const box = OJ.el("contestList");
@@ -41,19 +82,21 @@
           <div class="card">
             <div class="flex-between wrap">
               <div>
-                <div class="card-title" style="margin-bottom:4px">${OJ.esc(c.title)} <span class="badge ${stCls}">${stLabel}</span>${c.frozen_now ? ' <span class="badge yellow">🔒 已封榜</span>' : ''}</div>
+                <div class="card-title" style="margin-bottom:4px">${OJ.esc(c.title)} <span class="badge ${stCls}">${stLabel}</span>${c.frozen_now ? ' <span class="badge yellow">🔒 已封榜</span>' : ''}${c.require_approval ? ' <span class="badge cyan">需报名审核</span>' : ''}</div>
                 <div class="muted" style="font-size:13px">
                   模式 ${c.mode.toUpperCase()} · 题目 ${(c.problems || []).length} 道
                   · 开始 ${OJ.fmtTime(c.start_time)} · 结束 ${OJ.fmtTime(c.end_time)}
                   ${c.freeze_enabled ? " · 封榜 " + OJ.fmtTime(c.freeze_time) : ""}
                 </div>
                 ${c.description ? `<div class="muted mt-8" style="font-size:13px">${OJ.esc(c.description)}</div>` : ""}
+                ${regBlock(c)}
               </div>
               <div class="text-right">
                 <div id="cd-${c.id}" class="countdown"></div>
                 <div class="mt-8 flex gap-8" style="justify-content:flex-end">
                   <a class="btn btn-outline btn-sm" href="/leaderboard.html?c=${OJ.esc(c.id)}">查看榜单</a>
                   ${isAdmin ? `
+                    ${c.require_approval ? `<button class="btn btn-primary btn-sm" onclick="openReview('${OJ.esc(c.id)}')">报名审批${c.registration_stats && c.registration_stats.pending ? ` (${c.registration_stats.pending})` : ""}</button>` : ""}
                     <button class="btn btn-outline btn-sm" onclick="openForm('${OJ.esc(c.id)}')">编辑</button>
                     <button class="btn btn-danger btn-sm" onclick="del('${OJ.esc(c.id)}')">删除</button>
                     <button class="btn btn-outline btn-sm" onclick="resetScores('${OJ.esc(c.id)}')">清空成绩</button>` : ""}
@@ -101,7 +144,8 @@
             <option value="ioi" ${c && c.mode === "ioi" ? "selected" : ""}>IOI（总分）</option></select></div>
           <div class="form-group"><label>选项</label>
             <label style="font-weight:400"><input type="checkbox" id="f_freeze_en" ${c && c.freeze_enabled ? "checked" : ""}> 启用封榜</label>
-            <label style="font-weight:400;margin-left:12px"><input type="checkbox" id="f_visible" ${!c || c.visible ? "checked" : ""}> 公开可见</label></div>
+            <label style="font-weight:400;margin-left:12px"><input type="checkbox" id="f_visible" ${!c || c.visible ? "checked" : ""}> 公开可见</label>
+            <label style="font-weight:400;margin-left:12px"><input type="checkbox" id="f_require_approval" ${c && c.require_approval ? "checked" : ""}> 需要报名审核</label></div>
         </div>
         <div class="form-group"><label>竞赛题目</label>
           <div class="card" style="max-height:200px;overflow:auto;background:var(--surface-2)">${problemChecks || '<span class="muted">暂无题目</span>'}</div>
@@ -119,7 +163,7 @@
 
     async function save(id) {
       const problems = [...document.querySelectorAll('.modal input[type="checkbox"][value]')]
-        .filter(x => x.value && !["f_freeze_en","f_visible"].includes(x.id) && x.checked)
+        .filter(x => x.value && !["f_freeze_en","f_visible","f_require_approval"].includes(x.id) && x.checked)
         .map((x, i) => ({ problem_id: x.value, points: 100, order: i + 1 }));
       const body = {
         title: document.getElementById("f_title").value.trim(),
@@ -130,6 +174,7 @@
         mode: document.getElementById("f_mode").value,
         freeze_enabled: document.getElementById("f_freeze_en").checked,
         visible: document.getElementById("f_visible").checked,
+        require_approval: document.getElementById("f_require_approval").checked,
         problems,
       };
       try {
@@ -151,6 +196,48 @@
       if (!await OJ.confirmDialog("确定清空该竞赛全部成绩？")) return;
       try { await OJ.api("/contests/" + id + "/reset-scores", { method: "POST" }); OJ.toast("已清空", "success"); }
       catch (e) { OJ.toast(e.message, "error"); }
+    }
+
+    // ---------- 管理员：报名审批 ----------
+    async function openReview(cid) {
+      let items = [];
+      try { items = (await OJ.api("/contests/" + cid + "/registrations")).items; }
+      catch (e) { OJ.toast(e.message, "error"); return; }
+      const rows = items.map(r => {
+        const [label, cls] = REG_STATUS[r.status] || [r.status, "gray"];
+        return `<tr>
+          <td>${OJ.esc(r.nickname || r.username)}<div class="muted" style="font-size:12px">${OJ.esc(r.username)}</div></td>
+          <td class="muted" style="font-size:12px">${OJ.fmtTime(r.registered_at)}</td>
+          <td class="text-center"><span class="badge ${cls}">${label}</span>${r.note ? `<div class="muted" style="font-size:12px">${OJ.esc(r.note)}</div>` : ""}</td>
+          <td class="text-right">
+            ${r.status !== "approved" ? `<button class="btn btn-primary btn-sm" onclick="review('${OJ.esc(cid)}','${OJ.esc(r.user_id)}','approved')">通过</button>` : ""}
+            ${r.status !== "rejected" ? `<button class="btn btn-danger btn-sm" onclick="rejectWithNote('${OJ.esc(cid)}','${OJ.esc(r.user_id)}')">拒绝</button>` : ""}
+          </td>
+        </tr>`;
+      }).join("");
+      const body = items.length
+        ? `<div class="table-wrap"><table>
+            <thead><tr><th>用户</th><th>报名时间</th><th class="text-center">状态</th><th></th></tr></thead>
+            <tbody>${rows}</tbody></table></div>`
+        : `<div class="empty">暂无报名记录</div>`;
+      const mask = OJ.openModal("报名审批", body);
+      mask.querySelector(".modal").style.maxWidth = "720px";
+    }
+
+    async function review(cid, uid, status, note) {
+      try {
+        await OJ.api("/contests/" + cid + "/registrations/" + uid, { method: "PUT", body: { status, note: note || "" } });
+        OJ.toast(status === "approved" ? "已通过" : "已拒绝", "success");
+        document.querySelector(".modal-mask") && document.querySelector(".modal-mask").remove();
+        openReview(cid);
+        load();
+      } catch (e) { OJ.toast(e.message, "error"); }
+    }
+
+    async function rejectWithNote(cid, uid) {
+      const note = prompt("拒绝原因（可选，将展示给报名用户）：", "");
+      if (note === null) return;
+      review(cid, uid, "rejected", note.trim());
     }
 
     // 支持从排行榜跳转指定竞赛

@@ -43,6 +43,17 @@ def create_submission():
             return err("竞赛尚未开始", 400)
         if not contest.get("visble", True) and request.user.get("role") != "admin":
             return err("竞赛不存在", 404)
+        if contest.get("require_approval"):
+            from backend.api.contests import find_registration
+            reg = find_registration(contest, request.user["id"])
+            if request.user.get("role") != "admin":
+                if reg is None:
+                    return err("该竞赛需先报名并通过审核后才能提交", 403, 403)
+                if reg.get("status") == "pending":
+                    return err("报名审核中，通过后才能提交代码", 403, 403)
+                if reg.get("status") != "approved":
+                    note = reg.get("note")
+                    return err("报名未通过审核，无法参加该竞赛" + (f"：{note}" if note else ""), 403, 403)
         if contest.get("mode") == "acm" and request.user.get("role") != "admin":
             pass  # ACM 也允许提交，评分逻辑已在后端处理
     else:

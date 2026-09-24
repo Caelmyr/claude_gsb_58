@@ -145,7 +145,14 @@
         const data = await OJ_.api("/contests");
         const runnable = data.items.filter(c => c.status === "running");
         sel.innerHTML = '<option value="">练习模式（不计排名）</option>' +
-          runnable.map(c => `<option value="${OJ_.esc(c.id)}">${OJ_.esc(c.title)}</option>`).join("");
+          runnable.map(c => {
+            if (c.require_approval && !c.can_submit) {
+              const reg = c.my_registration;
+              const reason = !reg ? "需报名审核" : (reg.status === "pending" ? "报名审核中" : "报名未通过");
+              return `<option value="${OJ_.esc(c.id)}" disabled>${OJ_.esc(c.title)}（${reason}）</option>`;
+            }
+            return `<option value="${OJ_.esc(c.id)}">${OJ_.esc(c.title)}</option>`;
+          }).join("");
       } catch (e) {}
     }
 

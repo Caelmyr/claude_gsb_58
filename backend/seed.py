@@ -256,6 +256,28 @@ main()
             {"problem_id": "p1008", "points": 100, "order": 8},
         ],
         "visible": True,
+        "require_approval": False,
+        "registrations": [],
         "created_at": now_iso(),
     }
     atomic_write_json(os.path.join(config.CONTESTS_DIR, "c1.json"), contest)
+
+    # 5) 需报名审核的竞赛示例：用户报名 → 管理员审批 → 通过者才能提交
+    contest2 = {
+        "id": "c2", "title": "2026 校队选拔赛（需报名）",
+        "description": "仅限报名并审核通过的用户参加，请先报名等待管理员审批。",
+        "start_time": _iso(now - 600),
+        "end_time": _iso(now + 7200),
+        "freeze_time": None,
+        "freeze_enabled": False,
+        "mode": "ioi",
+        "problems": [
+            {"problem_id": "p1005", "points": 100, "order": 1},
+            {"problem_id": "p1006", "points": 100, "order": 2},
+        ],
+        "visible": True,
+        "require_approval": True,
+        "registrations": [],
+        "created_at": now_iso(),
+    }
+    atomic_write_json(os.path.join(config.CONTESTS_DIR, "c2.json"), contest2)
