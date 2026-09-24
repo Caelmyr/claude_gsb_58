@@ -43,6 +43,10 @@ def create_submission():
             return err("竞赛尚未开始", 400)
         if not contest.get("visble", True) and request.user.get("role") != "admin":
             return err("竞赛不存在", 404)
+        from backend.api.registrations import can_participate
+        allowed, reason = can_participate(contest, request.user)
+        if not allowed:
+            return err(reason, 403, 403)
         if contest.get("mode") == "acm" and request.user.get("role") != "admin":
             pass  # ACM 也允许提交，评分逻辑已在后端处理
     else:

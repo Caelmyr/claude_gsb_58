@@ -143,9 +143,21 @@
       const sel = document.getElementById("contestSelect");
       try {
         const data = await OJ_.api("/contests");
+        const admin = OJ_.isAdmin();
         const runnable = data.items.filter(c => c.status === "running");
         sel.innerHTML = '<option value="">练习模式（不计排名）</option>' +
-          runnable.map(c => `<option value="${OJ_.esc(c.id)}">${OJ_.esc(c.title)}</option>`).join("");
+          runnable.map(c => {
+            // 需报名竞赛：仅审核通过者（或管理员）可选，其余置灰并提示原因
+            let disabled = "", suffix = "";
+            if (c.registration_required && !admin) {
+              const st = c.my_registration && c.my_registration.status;
+              if (st === "approved") suffix = "（已报名✓）";
+              else if (st === "pending") { disabled = "disabled"; suffix = "（报名审核中）"; }
+              else if (st === "rejected") { disabled = "disabled"; suffix = "（报名未通过）"; }
+              else { disabled = "disabled"; suffix = "（需报名审核）"; }
+            }
+            return `<option value="${OJ_.esc(c.id)}" ${disabled}>${OJ_.esc(c.title)}${suffix}</option>`;
+          }).join("");
       } catch (e) {}
     }
 

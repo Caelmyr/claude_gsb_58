@@ -86,6 +86,7 @@ def require_admin(fn):
 from backend.api.auth import auth_bp            # noqa: E402
 from backend.api.problems import problems_bp    # noqa: E402
 from backend.api.contests import contests_bp    # noqa: E402
+from backend.api.registrations import registrations_bp  # noqa: E402
 from backend.api.submissions import submissions_bp  # noqa: E402
 from backend.api.leaderboard import leaderboard_bp  # noqa: E402
 from backend.api.forum import forum_bp          # noqa: E402
@@ -93,7 +94,7 @@ from backend.api.stats import stats_bp          # noqa: E402
 from backend.api.settings import settings_bp    # noqa: E402
 
 ALL_BLUEPRINTS = [
-    auth_bp, problems_bp, contests_bp, submissions_bp,
+    auth_bp, problems_bp, contests_bp, registrations_bp, submissions_bp,
     leaderboard_bp, forum_bp, stats_bp, settings_bp,
 ]
 

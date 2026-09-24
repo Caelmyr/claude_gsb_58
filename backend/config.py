@@ -18,6 +18,7 @@ SUBMISSIONS_DIR = os.path.join(DATA_DIR, "submissions")
 SCORES_DIR = os.path.join(DATA_DIR, "scores")
 USERS_DIR = os.path.join(DATA_DIR, "users")
 FORUM_DIR = os.path.join(DATA_DIR, "forum")
+REGISTRATIONS_DIR = os.path.join(DATA_DIR, "registrations")  # 竞赛报名分片
 SETTINGS_DIR = os.path.join(DATA_DIR, "settings")
 RUNS_DIR = os.path.join(DATA_DIR, "runs")          # 沙箱运行临时目录
 SETTINGS_FILE = os.path.join(SETTINGS_DIR, "system.json")
@@ -96,7 +97,8 @@ VERDICTS = ["PENDING", "JUDGING", "AC", "WA", "TLE", "MLE", "RE", "CE", "OLE", "
 def ensure_dirs():
     """确保所有数据目录存在。"""
     for d in (PROBLEMS_DIR, TESTCASES_DIR, CONTESTS_DIR, SUBMISSIONS_DIR,
-              SCORES_DIR, USERS_DIR, FORUM_DIR, SETTINGS_DIR, RUNS_DIR):
+              SCORES_DIR, USERS_DIR, FORUM_DIR, REGISTRATIONS_DIR,
+              SETTINGS_DIR, RUNS_DIR):
         os.makedirs(d, exist_ok=True)
     if not os.path.exists(SETTINGS_FILE):
         from backend.storage import atomic_write_json

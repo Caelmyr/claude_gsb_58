@@ -16,22 +16,27 @@ def _load(contest_id):
     return read_json(os.path.join(config.CONTESTS_DIR, f"{contest_id}.json"))
 
 
-def _decorate(c):
+def _decorate(c, user=None):
     if not c:
         return None
     out = dict(c)
     out["status"] = contest_status(c)
     out["elapsed"] = contest_elapsed(c)
     out["frozen_now"] = frozen_now(c)
+    out["registration_required"] = bool(c.get("registration_required"))
+    # 当前用户的报名状态（未登录或未报名为 None）
+    from backend.api.registrations import get_registration
+    reg = get_registration(c["id"], user["id"]) if user else None
+    out["my_registration"] = reg
     return out
 
 
-def list_all():
+def list_all(user=None):
     contests = []
     for cid in list_files(config.CONTESTS_DIR):
         c = _load(cid)
         if c:
-            contests.append(_decorate(c))
+            contests.append(_decorate(c, user))
     contests.sort(key=lambda c: c.get("start_time", ""))
     return contests
 
@@ -40,7 +45,7 @@ def list_all():
 def get_contests():
     current = get_current_user()
     is_admin = current and current.get("role") == "admin"
-    contests = list_all()
+    contests = list_all(user=current)
     if not is_admin:
         contests = [c for c in contests if c.get("visble", True)]
     return ok({"total": len(contests), "items": contests})
@@ -54,7 +59,7 @@ def get_contest(contest_id):
     user = get_current_user()
     if not c.get("visble", True) and (user is None or user.get("role") != "admin"):
         return err("竞赛不存在", 404)
-    return ok(_decorate(c))
+    return ok(_decorate(c, user))
 
 
 @contests_bp.post("/contests")
@@ -76,6 +81,7 @@ def create_contest():
         "mode": data.get("mode", "acm"),
         "problems": data.get("problems", []),
         "visible": data.get("visible", True),
+        "registration_required": bool(data.get("registration_required", False)),
         "created_at": now_iso(),
     }
     atomic_write_json(os.path.join(config.CONTESTS_DIR, f"{contest_id}.json"), c)
@@ -97,6 +103,8 @@ def update_contest(contest_id):
         c["freeze_enabled"] = bool(data["freeze_enabled"])
     if "visible" in data:
         c["visible"] = bool(data["visible"])
+    if "registration_required" in data:
+        c["registration_required"] = bool(data["registration_required"])
     if "title" in data and not (data["title"] or "").strip():
         return err("竞赛标题不能为空", 400)
     atomic_write_json(os.path.join(config.CONTESTS_DIR, f"{contest_id}.json"), c)
